@@ -1,0 +1,5 @@
+# raw dataset (.csv)
+dataset/
+# transfer data (.pkl)
+data/
+*.csv
