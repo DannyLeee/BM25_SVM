@@ -3,3 +3,4 @@ dataset/
 # transfer data (.pkl)
 data/
 *.csv
+*.ipynb
