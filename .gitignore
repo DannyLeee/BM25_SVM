@@ -2,5 +2,7 @@
 dataset/
 # transfer data (.pkl)
 data/
+
+model/
 *.csv
-*.ipynb
+**/*.ipynb
