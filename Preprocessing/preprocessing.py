@@ -3,9 +3,16 @@ import numpy as np
 import pickle
 from collections import Counter
 import nltk
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 nltk.download('stopwords')
 from nltk.corpus import stopwords
-path = '../dataset/'
+path = './dataset/'
 
 doc_df = pd.read_csv(path + 'documents.csv')
 doc_dict = dict()
@@ -16,6 +23,9 @@ Languages = list(stopwords.fileids())
 # Build remove terms
 remove_title = ['[Text]', 'Language:', '<F P=105>', '</F>', 'Article Type:BFN', '<F P=106>', 'Article Type:CSO', '[Excerpt]', '[Editorial Report]', '[passage omitted]', 'ONLY <F P=103>', '<F P=104>']
 remove_term = ['.', '"', '--', '\'s', '<', '>', '[', ']', '`', ',', ':', '/', '\\', '{', '}', '-', '(', ')']
+my_stopwords = ['mr', 'he\'d', 'also', 'every', 'would', 'without', 'per', 'yesterday', 'however', 'could', 'since', 'many', 'must', 'well', 'still', 'today', 'people', 'next']
+
+print('Stopwords removing processing\n')
 # Build dictionary
 for doc in doc_df.iloc:
     temp_str = doc['doc_text']
@@ -35,18 +45,28 @@ for doc in doc_df.iloc:
         if(w in temp_str):
             temp_str = temp_str.replace(w, '')
     # Removing stopwords
-    temp = Counter(temp_str.split())
-    if(Lang_flag):
-        # stopwords with origin and capitalize form
+    temp = temp_str.split()
+    tmp_len = len(temp)
+    for t in range(tmp_len):
+        temp[t] = temp[t].lower()
+    temp = Counter(temp)
+    for m in my_stopwords: # My stopwords set for all doc
+        if(m in temp):
+            del temp[m]
+    for s in stopwords.words('english'): # english stopwords for all doc
+        if(s in temp):
+            del temp[s]
+    if(Lang_flag and Lang_tmp != 'English'):
         for s in stopwords.words(Lang_tmp.lower()):
             if(s in temp):
                 del temp[s]
-            if(s.capitalize() in temp):
-                del temp[s.capitalize()]
     # Save to dict    
     doc_dict[doc['doc_id']] = temp
 
+print('.pkl file output\n')
 # File output
-pickle_out = open('../data/document.pickle', 'wb')
+pickle_out = open('./data/document.pkl', 'wb')
 pickle.dump(doc_dict, pickle_out)
 pickle_out.close()
+
+print('Down\n')
