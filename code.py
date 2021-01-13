@@ -1,8 +1,9 @@
+import pickle
 import argparse
 import pandas as pd
 from Preprocessing.preprocessing import preprocess
 from BM25.bm25 import get_feature
-from svm.prerpocess import get_svm_data
+from svm.prerpocess import get_svm_data, get_q_words
 from svm.model import train, test, eval
 
 from datetime import datetime,timezone,timedelta
@@ -11,36 +12,40 @@ def timestamp(msg=""):
     dt2 = dt1.astimezone(timezone(timedelta(hours=8))) # 轉換時區 -> 東八區
     print(f"{str(dt2)[:-13]}\t{msg}")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-mode", type=str, choices=["preprocess", "get_feture", "get_svm_data", "model", "scratch"], default="scratch")
-parser.add_argument("-doc_dict_path", type=str, default="data/document.pkl")
-parser.add_argument("-hidden_size", type=int, default=50)
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("-mode", type=str, choices=["train", "test", "preprocess", "get_feature", "get_svm_data"], required=True)
+parser.add_argument("-doc_dict_path", type=str, default="data/document.pkl", help="needed mode: except test")
+parser.add_argument("-hidden_size", type=int, default=50, help="feature words size; needed mode: get_feature")
 # bm25
-parser.add_argument("-bm_scratch", type=int)
+parser.add_argument("-bm_scratch", type=int, help="selete feature words from scratch or not; needed mode: train, get_feature")
+parser.add_argument("-feature_word_path", type=str, help="file path to save feature_words after selecting; needed mode: get_feature")
 # get svm data
-parser.add_argument("-df_path", type=str, help="preprocess/testing dataframe path (.csv)")
+parser.add_argument("-df_path", type=str, help="preprocess/testing dataframe path (.csv); needed mode: test, get_svm_data")
+parser.add_argument("-svm_data_path", type=str, help="file path to save svm_data after preprocess or load when testing; needed mode: test, get_svm_data")
+parser.add_argument("-lexicon_path", type=str, help="feature_words file path; needed mode: get_svm_data")
 # model
-parser.add_argument("-model_mode", type=str, choices=["train", "test", "eval"])
-parser.add_argument("-model_path", type=str)
+parser.add_argument("-model_mode", type=str, choices=["train", "test"])
+parser.add_argument("-model_path", type=str, help="the model path to save or load (.pkl); needed mode: train, test")
 args = parser.parse_args()
 
-print(args)
 
 # argment condition check
-if args.mode == "scratch" or args.mode == "model" or args.mode == "get_svm_data":
+if args.mode == "get_svm_data":
     if args.model_mode == None:
         parser.error(f"the following arguments are required: -model_mode in mode \`{args.mode}\`")
-if args.mode == "scratch" or (args.mode == "model" and args.model_mode == "test") or args.mode == "get_svm_data":
+if args.mode == "train" or args.mode == "test" or args.mode == "get_svm_data":
     if args.df_path == None:
         parser.error(f"the following arguments are required: -df_path in mode \`{args.mode}\`")
-if args.mode == "scratch" or args.mode == "model":
-    if args.model_mode == "train" or args.model_mode == "test":
-        if args.model_path is None:
-            parser.error(f"the following arguments are required: -model_path in model_mode \`{args.model_mode}\`")
+if args.mode == "train" or args.mode == "test":
+    if args.model_path is None:
+        parser.error(f"the following arguments are required: -model_path in mode \`{args.mode}\`")
+if args.mode == "get_feature":
+    if args.feature_word_path is None:
+        parser.error(f"the following arguments are required: -feature_word_path in mode \`{args.mode}\`")
             
 
 
-if args.mode == "scratch":
+if args.mode == "train":
     # raw_data preprocess to Counter for each document
     timestamp("preprocess start")
     doc_dict = preprocess(args) # {"doc_id": Counter of document}
@@ -50,30 +55,53 @@ if args.mode == "scratch":
     feature_words = get_feature(args, doc_dict) # ["words"...]
 
     # add query words to lexicon
-    train_df = pd.read_csv("dataset/train_queries.csv")
-    test_df = pd.read_csv("dataset/test_queries.csv")
-    query_words = []
-    for q in train_df['query_text']:
-        query_words += [w for w in q.split()]
-    for q in test_df['query_text']:
-        query_words += [w for w in q.split()]
-    del train_df, test_df
     lexicon = feature_words
-    lexicon += list(set(query_words))
+    lexicon += list(set(get_q_words()))
+    lexicon = list(set(lexicon))
     df = pd.read_csv(args.df_path)
     
     # vectorization to svm data
-    timestamp(f"each document convert to dimension {len(lexicon)} vector")
-    svm_data = get_svm_data(args.model_mode, df, doc_dict, lexicon)
+    timestamp(f"each document convert to dimension {len(lexicon)}'s vector")
+    svm_data = get_svm_data(args.mode, df, doc_dict, lexicon)
     
     # model training
     train(svm_data, args.model_path)   
 
-# elif args.mode == "preprocess":
-#     #
-# elif args.mode == "get_feture":
-#     #
-# elif args.mode == "get_svm_data":
-#     #
-# elif args.mode == "model":
-#     #
+elif args.mode == "test":
+    with open(args.svm_data_path, "rb") as fp:
+        svm_data = pickle.load(fp)
+    test_df = pd.read_csv(args.df_path)
+    ans_df = pd.read_csv("dataset/FinalProjectTestSet/answer.txt")
+    ans_df = ans_df.fillna("")
+    test(svm_data, args.model_path, test_df)
+    predict_df = pd.read_csv("result.csv")
+    print(f"map@1000: {eval(ans_df, predict_df)}")
+
+elif args.mode == "preprocess":
+    timestamp("preprocess start")
+    preprocess(args) # {"doc_id": Counter of document}
+
+elif args.mode == "get_feature":
+    # bm25 select feature words
+    timestamp("select feature start")
+    feature_words = get_feature(args) # ["words"...]
+    print('Save feature_words')
+    with open(args.feature_word_path, 'wb') as f:
+        pickle.dump(feature_words, f)
+
+elif args.mode == "get_svm_data":
+    with open(args.doc_dict_path, "rb") as doc_fp:
+        doc_dict = pickle.load(doc_fp)
+    with open(args.lexicon_path, "rb") as lexicon_fp:
+        lexicon = pickle.load(lexicon_fp)
+    
+    # add query words to lexicon
+    lexicon += list(set(get_q_words()))
+    lexicon = list(set(lexicon))
+    df = pd.read_csv(args.df_path)
+    
+    # vectorization to svm data
+    timestamp(f"each document convert to dimension {len(lexicon)}'s' vector")
+    with open(args.svm_data_path, "wb") as fp:
+        pickle.dump(get_svm_data(args.model_mode, df, doc_dict, lexicon), fp)
+    timestamp(f"result data saved at {args.svm_data_path}")

@@ -70,5 +70,5 @@ def preprocess(args):
     pickle.dump(doc_dict, pickle_out)
     pickle_out.close()
 
-    print('Down\n')
+    print('Done\n')
     return doc_dict

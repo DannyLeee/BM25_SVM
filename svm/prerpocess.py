@@ -90,15 +90,7 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 
     return svm_data # List[Dict] = [{q_id, d_id, label, doc_vec}...] / [{q_id, d_id, doc_vec, bm_score}...]
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-mode", type=str, choices=["train", "test"], required=True)
-    parser.add_argument("-df_path", type=str, required=True)
-    parser.add_argument("-des_path", type=str, required=True)
-    parser.add_argument("-doc_dict_path",type=str, required=True)
-    parser.add_argument("-lexicon_path",type=str, required=True)
-    args = parser.parse_args()
-
+def get_q_words():
     train_df = pd.read_csv("dataset/train_queries.csv")
     test_df = pd.read_csv("dataset/test_queries.csv")
     query_words = []
@@ -107,16 +99,27 @@ if __name__ == "__main__":
     for q in test_df['query_text']:
         query_words += [w for w in q.split()]
     del train_df, test_df
+    return query_words
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-mode", type=str, choices=["train", "test"], required=True)
+    parser.add_argument("-df_path", type=str, required=True)
+    parser.add_argument("-svm_data_path", type=str, required=True)
+    parser.add_argument("-doc_dict_path",type=str, required=True)
+    parser.add_argument("-lexicon_path",type=str, required=True)
+    args = parser.parse_args()
 
     df = pd.read_csv(args.df_path)
     with open(args.doc_dict_path, "rb") as doc_fp:
-        with open(args.lexicon_path, "rb") as lexicon_fp:
-            with open(args.des_path, "wb") as fp:
-                doc_dict = pickle.load(doc_fp)
-                lexicon = pickle.load(lexicon_fp)
-                lexicon += list(set(query_words))
-                timestamp(f"each document convert to dimension {len(lexicon)} vector")
-                with open("data/lexicon.pkl", "wb") as fp2:
-                    pickle.dump(lexicon, fp2)
-                pickle.dump(get_svm_data(args.mode, df, doc_dict, lexicon), fp)
-                timestamp(f"result data saved at {args.des_path}")
+        doc_dict = pickle.load(doc_fp)
+    with open(args.lexicon_path, "rb") as lexicon_fp:
+        lexicon = pickle.load(lexicon_fp)
+    with open(args.svm_data_path, "wb") as fp:
+        lexicon += list(set(get_q_words()))
+        lexicon = list(set(lexicon))
+        timestamp(f"each document convert to dimension {len(lexicon)}'s vector")
+        with open("data/lexicon.pkl", "wb") as fp2:
+            pickle.dump(lexicon, fp2)
+        pickle.dump(get_svm_data(args.mode, df, doc_dict, lexicon), fp)
+        timestamp(f"result data saved at {args.svm_data_path}")
