@@ -3,6 +3,7 @@ dataset/
 # transfer data (.pkl)
 data/
 
+.vscode/
 __pycache__/
 model/
 *.csv

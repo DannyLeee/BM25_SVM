@@ -3,6 +3,7 @@ import pickle
 import argparse
 import pandas as pd
 from tqdm import tqdm
+from copy import deepcopy
 from scipy.sparse import csr_matrix
 
 from datetime import datetime,timezone,timedelta
@@ -12,12 +13,13 @@ def timestamp(msg=""):
     print(f"{str(dt2)[:-13]}\t{msg}")
 
 # Counter to vector
-def counter_2_vector(doc_counter, query, lexicon):
+def counter_2_vector(doc_counter, query, lexicon, add_q):
     doc_vec = [0] * len(lexicon)
     for i, word in enumerate(lexicon):
         doc_vec[i] = doc_counter[word]
-    for i, word in enumerate(query.split()):
-        doc_vec[lexicon.index(word)] += 1
+    if add_q:
+        for i, word in enumerate(query.split()):
+            doc_vec[lexicon.index(word)] += 1
     return csr_matrix(doc_vec)
 
 # sample training doc
@@ -28,6 +30,7 @@ doc_dict: document counter dictionary
 lexicon: list of string
 """
 def get_svm_data(mode, df, doc_dict, lexicon):
+    random.seed(666)
     assert mode in ["train", "test"]
     q_id_list = df['query_id']
     q_list = df['query_text']
@@ -37,6 +40,7 @@ def get_svm_data(mode, df, doc_dict, lexicon):
         bm25_top1000_score_list = df['bm25_top1000_scores']
     bm25_top1000_list = df['bm25_top1000']
     svm_data = []
+    svm_data_nq = []
 
     for idx, q_id in tqdm(enumerate(q_id_list)):
         # query = q_list[idx]
@@ -47,6 +51,7 @@ def get_svm_data(mode, df, doc_dict, lexicon):
             pos_count = 0
             pos_doc_ids = pos_doc_ids_list[idx].split()
             neg_doc = list(set(bm25_top1000) - set(pos_doc_ids))
+            neg_doc.sort()
 
             for r_doc in pos_doc_ids:
                 pos_count += 1
@@ -56,10 +61,11 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['d_id'] = r_doc
                 data_dict['label'] = 1
 
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[r_doc], q_list[idx], lexicon)
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[r_doc], q_list[idx], lexicon, True)
+                svm_data += [deepcopy(data_dict)]
 
-                svm_data += [data_dict]
-                
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[r_doc], q_list[idx], lexicon, False)
+                svm_data_nq += [deepcopy(data_dict)]
             neg_selected = set()
             for _ in range(pos_count):
                 data_dict = dict()
@@ -73,9 +79,11 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['d_id'] = sampled_neg_doc
                 data_dict['label'] = 0
 
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[sampled_neg_doc], q_list[idx], lexicon)
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[sampled_neg_doc], q_list[idx], lexicon, True)
+                svm_data += [deepcopy(data_dict)]
 
-                svm_data += [data_dict]
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[sampled_neg_doc], q_list[idx], lexicon, False)
+                svm_data_nq += [deepcopy(data_dict)]
 
         elif mode  == "test":
             bm25_top1000_score = bm25_top1000_score_list[idx].split()
@@ -84,11 +92,14 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['q_id'] = q_id
                 data_dict['query'] = q_list[idx]
                 data_dict['doc_id'] = doc
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[doc], q_list[idx], lexicon)
                 data_dict['bm_score'] = float(bm25_top1000_score[i])
-                svm_data += [data_dict]
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[doc], q_list[idx], lexicon, True)
+                svm_data += [deepcopy(data_dict)]
+
+                data_dict['doc_vec'] = counter_2_vector(doc_dict[doc], q_list[idx], lexicon, False)
+                svm_data_nq += [deepcopy(data_dict)]
                 
-    return svm_data # List[Dict] = [{q_id, d_id, label, doc_vec}...] / [{q_id, d_id, doc_vec, bm_score}...]
+    return svm_data, svm_data_nq # List[Dict] = [{q_id, d_id, label, doc_vec}...] / [{q_id, d_id, doc_vec, bm_score}...]
 
 def get_q_words():
     train_df = pd.read_csv("dataset/train_queries.csv")
@@ -118,6 +129,7 @@ if __name__ == "__main__":
     with open(args.svm_data_path, "wb") as fp:
         lexicon += list(set(get_q_words()))
         lexicon = list(set(lexicon))
+        lexicon.sort()
         timestamp(f"each document convert to dimension {len(lexicon)}'s vector")
         with open("data/lexicon.pkl", "wb") as fp2:
             pickle.dump(lexicon, fp2)
