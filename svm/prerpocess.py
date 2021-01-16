@@ -64,8 +64,6 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['doc_vec'] = counter_2_vector(doc_dict[r_doc], q_list[idx], lexicon, True)
                 svm_data += [deepcopy(data_dict)]
 
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[r_doc], q_list[idx], lexicon, False)
-                svm_data_nq += [deepcopy(data_dict)]
             neg_selected = set()
             for _ in range(pos_count):
                 data_dict = dict()
@@ -82,9 +80,6 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['doc_vec'] = counter_2_vector(doc_dict[sampled_neg_doc], q_list[idx], lexicon, True)
                 svm_data += [deepcopy(data_dict)]
 
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[sampled_neg_doc], q_list[idx], lexicon, False)
-                svm_data_nq += [deepcopy(data_dict)]
-
         elif mode  == "test":
             bm25_top1000_score = bm25_top1000_score_list[idx].split()
             for i, doc in enumerate(bm25_top1000):
@@ -96,10 +91,7 @@ def get_svm_data(mode, df, doc_dict, lexicon):
                 data_dict['doc_vec'] = counter_2_vector(doc_dict[doc], q_list[idx], lexicon, True)
                 svm_data += [deepcopy(data_dict)]
 
-                data_dict['doc_vec'] = counter_2_vector(doc_dict[doc], q_list[idx], lexicon, False)
-                svm_data_nq += [deepcopy(data_dict)]
-                
-    return svm_data, svm_data_nq # List[Dict] = [{q_id, d_id, label, doc_vec}...] / [{q_id, d_id, doc_vec, bm_score}...]
+    return svm_data # List[Dict] = [{q_id, d_id, label, doc_vec}...]
 
 def get_q_words():
     train_df = pd.read_csv("dataset/train_queries.csv")

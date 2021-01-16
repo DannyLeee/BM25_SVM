@@ -43,7 +43,7 @@ def test(svm_data, model_path, test_df):
 
     with open("result.csv", 'w') as fp:
         fp.write("query_id,ranked_doc_ids\n")
-        for i, q_id in tqdm(enumerate(q_list)):
+        for i, q_id in enumerate(q_list):
             d_list = doc_list[i].split()
             fp.write(str(q_id)+',')
             bm_score = np.array([float(s) for s in doc_score[i].split()])
@@ -58,7 +58,7 @@ def test(svm_data, model_path, test_df):
             for idx in sortidx:
                 fp.write(d_list[idx]+' ')
             fp.write("\n")
-    timestamp("output saved at result.csv")
+    # timestamp("output saved at result.csv")
 
     return
 
@@ -86,4 +86,9 @@ if __name__ == "__main__":
         ans_df = ans_df.fillna("")
         test(svm_data, args.model_path, test_df)
         predict_df = pd.read_csv("result.csv")
-        print(f"map@1000: {eval(ans_df, predict_df)}")        
+        print(f"map@1000: {eval(ans_df, predict_df)}")
+    elif args.mode == "eval":
+        predict_df = pd.read_csv(args.df_path)
+        ans_df = pd.read_csv("dataset/FinalProjectTestSet/answer.txt")
+        ans_df = ans_df.fillna("")
+        print(f"map@1000: {eval(ans_df, predict_df)}")

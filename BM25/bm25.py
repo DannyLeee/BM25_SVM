@@ -99,7 +99,7 @@ def get_feature(args, doc_dict=None):
     feature_words = []
     for term_index in np.flip(bm25_matrix.argsort())[:feature_amount]:
         feature_words.append(index_term[term_index])
-    print(feature_words)
+    # print(feature_words)
 
 
     print('Done')
