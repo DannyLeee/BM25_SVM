@@ -14,17 +14,17 @@ def timestamp(msg=""):
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-mode", type=str, choices=["train_scratch", "train", "test", "preprocess", "get_feature", "get_svm_data"], required=True)
-parser.add_argument("-doc_dict_path", type=str, default="data/document.pkl", help="")
+parser.add_argument("-doc_dict_path", type=str, default="data/document.pkl", help=" ")
 parser.add_argument("-hidden_size", type=int, default=50, help="feature words size")
 # bm25
-parser.add_argument("-bm_scratch", type=int, default=0, help="selete feature words from scratch or not")
+parser.add_argument("-bm_scratch", type=int, default=0, help="select feature words from scratch or not")
 parser.add_argument("-feature_word_path", type=str, help="file path to save feature_words after selecting")
 # get svm data
 parser.add_argument("-df_path", type=str, help="preprocess/testing dataframe path (.csv)")
 parser.add_argument("-svm_data_path", type=str, help="file path to save svm_data after preprocess or load when testing")
 parser.add_argument("-lexicon_path", type=str, help="feature_words file path")
 # model
-parser.add_argument("-model_mode", type=str, choices=["train", "test"])
+parser.add_argument("-model_mode", type=str, choices=["train", "test"], help="decide the data will be processed in which mode")
 parser.add_argument("-model_path", type=str, help="the model path to save or load (.pkl)")
 args = parser.parse_args()
 
@@ -42,6 +42,7 @@ if args.mode == "train" or args.mode == "test":
 if args.mode == "get_feature":
     if args.feature_word_path is None:
         parser.error(f"the following arguments are required: -feature_word_path in mode `{args.mode}`")
+
 if args.mode == "train_scratch":
     with open(args.doc_dict_path, "rb") as doc_fp:
         doc_dict = pickle.load(doc_fp)
